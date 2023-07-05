@@ -73,9 +73,12 @@ function energ(r,Ω,d,t,τ,elong) # Programa para calcular la energía de una co
       # Calculamos la energía del primer punto
       l = sqrt((r[2,1]-r[1,1])^2+(r[2,2]-r[1,2])^2)
       e += ((l-l0)^2.0)/2.0 
-      for j = 2:d # Potencial de Lennard-Jones
-            l = sqrt((r[j,1]-r[1,1])^2+(r[j,2]-r[1,2])^2)
-            e += 4.0*ϵ*((l0/(l*2^(1/6)))^12-(l0/(l*2^(1/6)))^6)
+      # Potencial Lenard-Jones
+      for i = 1:d-1
+            l = sqrt((r[mod1(i+1,d),1]-r[1,1])^2.0+(r[mod1(1+i,d),2]-r[1,2])^2.0)
+            if l<=(d-1)/(25*6) # Ancho de la bacteria 
+                  e += exp(1000000) # Potencial escalón
+            end
       end
       
       
@@ -83,44 +86,14 @@ function energ(r,Ω,d,t,τ,elong) # Programa para calcular la energía de una co
             l = sqrt((r[i+1,1]-r[i,1])^2.0+(r[i+1,2]-r[i,2])^2.0)
             #lb2 = ((r[i+1,1]-r[i,1])-(r[i,1]-r[i-1,1]))^2.0+((r[i+1,2]-r[i,2])-(r[i,2]-r[i-1,2]))^2.0
             e += ((l-l0)^2.0)/2.0 + Ω*(θ[i]-pi)^2.0 #+ Ω*lb2/(4.0*l0^2.0) 
-            for j = i:d
-                  l = sqrt((r[j,1]-r[i,1])^2+(r[j,2]-r[i,2])^2)
-                  e += 4.0*ϵ*((l0/(l*2^(1/6)))^12-(l0/(l*2^(1/6)))^6)
+            # Potencial Lenard-Jones
+            for j = 1:d-1
+                  l = sqrt((r[mod1(j+i,d),1]-r[i,1])^2.0+(r[mod1(j+i,d),2]-r[i,2])^2.0)
+                  if l<=(d-1)/(25*6) # Ancho de la bacteria 
+                        e += exp(1000000) # Potencial escalón
+                  end
             end
       end
-
-      #e += step(r,d,l0)
-
-      return e 
-end
-
-
-
-function energver(r,Ω,d,t,τ,elong,j) # Programa para calcular la energía de una configuración r con parámetros l_0, Ω ,θ_0
-
-      # Inicializamos la energía y calculamos la matrix de ángulos
-      e = 0.0
-      if elong==true
-            l0 = 2.0^((t-1)/τ)
-      elseif elong==false
-            l0 = 1.0
-      else return "ERROR"
-      end 
-      θ = ang(r,d)
-      ϵ = 0.1
-
-      if j==1
-            l = sqrt((r[2,1]-r[1,1])^2.0+(r[2,2]-r[1,2])^2.0)
-            return ((l-l0)^2.0)/2.0
-      elseif j==d
-            l = sqrt((r[d,1]-r[d-1,1])^2.0+(r[d,2]-r[d-1,2])^2.0)
-            return ((l-l0)^2.0)/2.0
-      end
-            
-      
-      lp = sqrt((r[j+1,1]-r[j,1])^2.0+(r[j+1,2]-r[j,2])^2.0)
-      lm = sqrt((r[j-1,1]-r[j,1])^2.0+(r[j-1,2]-r[j,2])^2.0)
-      e = ((lp-l0)^2.0)/2.0 + ((lm-l0)^2.0)/2.0 + Ω*(θ[j]-pi)^2.0  
 
       #e += step(r,d,l0)
 
@@ -175,23 +148,11 @@ function ead(r,e0,ax,ay,r0,d,n)
       return   e0   
 end
 
-#=
-x = range(1, 25, length=100)
-y = range(1, 25, length=100)
-e = zeros(25,25)
-for i = 1:25
-      for j = 1:25
-            e[i,j]=ead(i,j,0.0,0.2,26,100)
-      end
-end
-=#
-
-
 
 function step(r,d,l0)
       e = 0.0
-      δ = 0.25
-      x0 = d/2.0
+      δ = 1.0
+      x0 = (d-1)/2.0
       #x1 = d/3.0
       #x2 = d*2.0/3.0
       for i = 1:d
@@ -242,7 +203,6 @@ function cevol!(r,β,Ω,d,t,τ,elong)#=,ead0,ax,ay,r0,n=#
             #println(pacep,pr)
 
             # Aplicamos la selección de M-H y comprobamos si la nueva configuración tiene loops cerrados
-            loop = loops(r,d)
             if pr > pacep
                   r[j,1] -= (δ)*cos(σ)
                   r[j,2] -= (δ)*sin(σ)
@@ -332,7 +292,7 @@ function curv(r,d)
             yp = (r[i+1,2] - r[i-1,2])/2.0
             xpp = (r[i+1,1] - 2.0*r[i,1] + r[i-1,1])
             ypp = (r[i+1,2] - 2.0*r[i,2] + r[i-1,2])
-            c += abs(xp*ypp + yp*xpp)/(xp^2.0 + yp^2.0)^(1.5)
+            c += abs(xp*ypp - yp*xpp)/(xp^2.0 + yp^2.0)^(1.5)
       end
 
       c = c/(d-2)
@@ -342,7 +302,7 @@ end
 
 
 
-function bacteri!(Ω,β,d,f)
+function bacteri!(Ω,β,d,f,elong)
 
       a = 0.0
       touch("conf.txt")
@@ -365,11 +325,12 @@ function bacteri!(Ω,β,d,f)
 
       for i = 1:f
             # Realizamos un paso de Montecarlo
-            a += cevol!(r,β,Ω,d,i,f,true)#=,ead0,ax,ay,r0,n=#
-
-            #=for j = 1:d
-                  write(conf,string(round(r[j,1], sigdigits=5)),string(round(r[j,2], sigdigits=5)))
-            end=#
+            #a += cevol!(r,β,Ω,d,i,f,elong)#=,ead0,ax,ay,r0,n=#
+            if i <= floor(Int,f/2)
+                  a += cevol!(r,β,Ω,d,i,f,elong)#=,ead0,ax,ay,r0,n=#
+            elseif i > floor(Int,f/2)
+                  a += cevol!(r,β,Ω,d,floor(Int,f/2),f,elong)
+            end
             if mod(i*150,f)==0.0
                   writedlm(conf,r)
             end
@@ -472,10 +433,10 @@ e2=plot(e[:,5:10],label=[a5 a6 a7 a8 a9 a10],title="Energy decay dependence on �
 function betau(Ω,d,f,n)
 
       # Iniciamos los vectores
-      p = 10
+      p = 5
       β = zeros(p)
-      betin = 100.0
-      betfin = 500.0
+      betin = 400.0
+      betfin = 900.0
       e = zeros(f,p)
       e_cut = 0.0
       τ = zeros(p)
@@ -494,7 +455,7 @@ function betau(Ω,d,f,n)
                   end
                   e_cut = energ(r,Ω,d,1,f,false)/exp(1)
 
-                  e[1,i] += energ(r,Ω,d,1,f,false)/n
+                  e[1,i] += energ(r,Ω,d,1,f,false)
 
                   for k = 2:f
                         cevol!(r,β[i],Ω,d,k,f,false)
@@ -505,7 +466,7 @@ function betau(Ω,d,f,n)
                               a += 1
                         end
 
-                        e[k,i] += ei/n
+                        e[k,i] += ei
                   end
                   conf += a
             end
@@ -513,6 +474,7 @@ function betau(Ω,d,f,n)
       end
 
       τ .= τ./n
+      e .= e./n
 
       return β, e, τ
     
@@ -604,7 +566,7 @@ e2=plot(e[:,5:10],label=[a5 a6 a7 a8 a9 a10],title="Energy decay dependence on �
 
 
 
-function li(Ω,β,d,f,n)
+function li(Ω,β,d,f,n,elong)
 
       # Iniciamos los vectores
       li = zeros(f,n)
@@ -640,7 +602,7 @@ function li(Ω,β,d,f,n)
             
 
             for t = 2:f
-                  cevol!(r,β,Ω,d,t,f,true)
+                  cevol!(r,β,Ω,d,t,f,elong)
                   for i = 1:d-1
                         li[t,j] += sqrt((r[i+1,1]-r[i,1])^2.0+(r[i+1,2]-r[i,2])^2.0)
                   end
@@ -681,24 +643,24 @@ function li(Ω,β,d,f,n)
       return l, sl, r2, sr, c, sc
 end
 #=plot(c,ribbon=sc,fillalpha=.5)
-l = zeros(1650,3);
-c = zeros(1650,3);
+l = zeros(6000,3);
+c = zeros(6000,3);
 for i = 1:3
-      l[:,i],_,_,_,c[:,i],_ = li(0.025*4^(i-1),400.0/4^(i-1),16*2^(i-1),1650,1000)
+      l[:,i],_,_,_,c[:,i],_ = li(0.1*i^(2),300.0/i^(2),25*i+1,6000,200)
 end
-pl = plot(l,label=["n=13" "n=26" "n=52"],title="Longitud promedio para varias lattices",legend=:topleft)
-pc = plot(c,label=["n=13" "n=26" "n=52"],title="Curvatura promedio para varias lattices",legend=:topleft)
+pl = plot(l,label=[ "n=26" "n=51" "n=76"],xlabel="t",ylabel="⟨l⟩",title="Longitud promedio para varias lattices",legend=:topleft)
 sl = zeros(1650,3);
-sc = zeros(1650,3);=#
+sc = zeros(1650,3);
+plot([le,lc],linestyle=[:dash :dash],linecolor=[:red :blue],label=false,ylabel="⟨l⟩",xlabel="t",gridstyle=:dash)
+plot!(twinx(),[ce,cc],legend=:topleft,yrange=[0.09,0.13],linestyle=[:solid :solid],linecolor=[:red :blue],label=false,ylabel="curv.")
+=#
 
 
 
 
 
-function ei(Ω,β,d,f,n)
+function ei(Ω,β,d,f,n,elong)
 
-      # Decidimos si el sistema se elonga o no
-      elong = true
 
       # Iniciamos los vectores
       ei = zeros(f,n)
